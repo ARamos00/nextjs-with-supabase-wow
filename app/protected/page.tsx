@@ -5,8 +5,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import BlizzardAuthButton from "@/components/BlizzardAuthButton";
 import BlizzardProfile from "@/components/BlizzardProfile";
-import BlacksmithingAuctionItems from "@/components/BlacksmithingAuctionItems";
-import AuctionHistoryViewer from "@/components/AuctionHistoryViewer";
+
 
 export default async function ProtectedPage() {
   const supabase = await createClient();
@@ -50,24 +49,6 @@ export default async function ProtectedPage() {
           <BlizzardProfile />
         ) : (
           <p>Connect your Blizzard account to see your profile data.</p>
-        )}
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <h2 className="font-bold text-2xl mb-4">Blacksmithing Auction Items</h2>
-        {connected ? (
-          <BlacksmithingAuctionItems />
-        ) : (
-          <p>Connect your Blizzard account to fetch auction data.</p>
-        )}
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <h2 className="font-bold text-2xl mb-4">Auction History Viewer</h2>
-        {connected ? (
-          <AuctionHistoryViewer />
-        ) : (
-          <p>Connect your Blizzard account to view historical auction data.</p>
         )}
       </section>
     </div>
