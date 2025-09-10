@@ -110,7 +110,7 @@ npm run dev     # http://localhost:3000
 
 ---
 
-## Suggested schema (conceptual)
+## Suggested schema
 
 > Check your `supabase/` migrations for exact DDL. This is the typical shape for this app.
 
