@@ -1,104 +1,142 @@
-<a href="https://demo-nextjs-with-supabase.vercel.app/">
-  <img alt="Next.js and Supabase Starter Kit - the fastest way to build apps with Next.js and Supabase" src="https://demo-nextjs-with-supabase.vercel.app/opengraph-image.png">
-  <h1 align="center">Next.js and Supabase Starter Kit</h1>
-</a>
+# WoW Auction Tracker — Next.js + Supabase
 
-<p align="center">
- The fastest way to build apps with Next.js and Supabase
-</p>
+A Next.js app + Supabase backend that ingests **World of Warcraft Auction House** data on a cadence, **enriches** missing item metadata via the **Item API**, and **stores historical prices** for analysis and charts. Built to learn, but structured so it’s easy to extend.
 
-<p align="center">
-  <a href="#features"><strong>Features</strong></a> ·
-  <a href="#demo"><strong>Demo</strong></a> ·
-  <a href="#deploy-to-vercel"><strong>Deploy to Vercel</strong></a> ·
-  <a href="#clone-and-run-locally"><strong>Clone and run locally</strong></a> ·
-  <a href="#feedback-and-issues"><strong>Feedback and issues</strong></a>
-  <a href="#more-supabase-examples"><strong>More Examples</strong></a>
-</p>
-<br/>
+> Based on the official **Next.js + Supabase Starter** (App Router, Tailwind, shadcn/ui, `@supabase/ssr`)
 
-## Features
+---
 
-- Works across the entire [Next.js](https://nextjs.org) stack
-  - App Router
-  - Pages Router
-  - Middleware
-  - Client
-  - Server
-  - It just works!
-- supabase-ssr. A package to configure Supabase Auth to use cookies
-- Styling with [Tailwind CSS](https://tailwindcss.com)
-- Components with [shadcn/ui](https://ui.shadcn.com/)
-- Optional deployment with [Supabase Vercel Integration and Vercel deploy](#deploy-your-own)
-  - Environment variables automatically assigned to Vercel project
+## What it does (high level)
 
-## Demo
+* **Fetch auctions (commodities):** Pulls from Blizzard’s **Commodities** feed (`/data/wow/auctions/commodities`) on an hourly cadence (that feed itself updates hourly).
+* **Enrich missing items:** Looks up item details only when the item isn’t already in our DB (use Item Search/Game Data APIs).
+* **Persist history:** Stores auction snapshots & price history in Supabase so you can graph trends over time.
+* **Web UI:** Next.js App Router pages/components render lists and detail views powered by Supabase queries.
 
-You can view a fully working demo at [demo-nextjs-with-supabase.vercel.app](https://demo-nextjs-with-supabase.vercel.app/).
+---
 
-## Deploy to Vercel
+## Architecture
 
-Vercel deployment will guide you through creating a Supabase account and project.
+```
+┌──────────────┐      ┌────────────────────────────┐
+│ CRON / Job   │      │ Blizzard Game Data APIs    │
+│ (Vercel/GHA) ├─────▶│ - /data/wow/auctions/...   │
+└─────┬────────┘      │ - /data/wow/search/item    │
+      │               └─────────────┬──────────────┘
+      │                               hourly data
+      ▼
+┌──────────────┐  upsert  ┌────────────────────────┐
+│ Ingest Logic │────────▶ │ Supabase (Postgres)    │
+│ (server)     │          │ - items                │
+└─────┬────────┘          │ - auctions_snapshot    │
+      │                   │ - auction_price_history│
+      │ query             └─────────────┬──────────┘
+      ▼                                 │
+┌──────────────┐                        │
+│ Next.js UI   │◀───────────────────────┘
+│ (App Router) │
+└──────────────┘
+```
 
-After installation of the Supabase integration, all relevant environment variables will be assigned to the project so the deployment is fully functioning.
+* Blizzard **OAuth (client credentials)** used to obtain an app token (no user login) for Game Data endpoints.
+* **Supabase JS client** (+ `@supabase/ssr`) for DB access/SSR.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fnext.js%2Ftree%2Fcanary%2Fexamples%2Fwith-supabase&project-name=nextjs-with-supabase&repository-name=nextjs-with-supabase&demo-title=nextjs-with-supabase&demo-description=This+starter+configures+Supabase+Auth+to+use+cookies%2C+making+the+user%27s+session+available+throughout+the+entire+Next.js+app+-+Client+Components%2C+Server+Components%2C+Route+Handlers%2C+Server+Actions+and+Middleware.&demo-url=https%3A%2F%2Fdemo-nextjs-with-supabase.vercel.app%2F&external-id=https%3A%2F%2Fgithub.com%2Fvercel%2Fnext.js%2Ftree%2Fcanary%2Fexamples%2Fwith-supabase&demo-image=https%3A%2F%2Fdemo-nextjs-with-supabase.vercel.app%2Fopengraph-image.png)
+---
 
-The above will also clone the Starter kit to your GitHub, you can clone that locally and develop locally.
+## Repo layout (top-level)
 
-If you wish to just develop locally and not deploy to Vercel, [follow the steps below](#clone-and-run-locally).
+```
+app/          # Next.js routes (App Router)
+components/   # UI components (shadcn/ui + Tailwind)
+lib/          # helpers (fetch/auth/formatters)
+supabase/     # project assets (e.g., migrations) if present
+utils/        # supabase client, shared utils
+```
 
-## Clone and run locally
+(See repo root for these directories.)
 
-1. You'll first need a Supabase project which can be made [via the Supabase dashboard](https://database.new)
+---
 
-2. Create a Next.js app using the Supabase Starter template npx command
+## Setup
 
-   ```bash
-   npx create-next-app --example with-supabase with-supabase-app
-   ```
+### 1) Prereqs
 
-   ```bash
-   yarn create next-app --example with-supabase with-supabase-app
-   ```
+* Node 18+
+* Supabase project (free tier is fine)
+* Blizzard Developer account & **client credentials** (for OAuth)
 
-   ```bash
-   pnpm create next-app --example with-supabase with-supabase-app
-   ```
+### 2) Env vars
 
-3. Use `cd` to change into the app's directory
+Create `.env.local` (copy from `.env.example` for Supabase defaults):
 
-   ```bash
-   cd with-supabase-app
-   ```
+```bash
+# Supabase (public keys used by browser too)
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 
-4. Rename `.env.example` to `.env.local` and update the following:
+# If your server job needs elevated writes (server-only!)
+SUPABASE_SERVICE_ROLE=...     # DO NOT expose to client
 
-   ```
-   NEXT_PUBLIC_SUPABASE_URL=[INSERT SUPABASE PROJECT URL]
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=[INSERT SUPABASE PROJECT API ANON KEY]
-   ```
+# Blizzard OAuth (Client Credentials)
+BNET_CLIENT_ID=...
+BNET_CLIENT_SECRET=...
+BNET_REGION=us                # us | eu | kr | tw
+BNET_NAMESPACE=dynamic-us     # e.g. dynamic-us, dynamic-eu
+BNET_LOCALE=en_US
+```
 
-   Both `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` can be found in [your Supabase project's API settings](https://app.supabase.com/project/_/settings/api)
+* Use **client credentials** flow to fetch tokens before calling Game Data APIs.
 
-5. You can now run the Next.js local development server:
+### 3) Install & run
 
-   ```bash
-   npm run dev
-   ```
+```bash
+npm install
+npm run dev     # http://localhost:3000
+```
 
-   The starter kit should now be running on [localhost:3000](http://localhost:3000/).
+(Bootstrapped from the Next.js + Supabase starter.)
 
-6. This template comes with the default shadcn/ui style initialized. If you instead want other ui.shadcn styles, delete `components.json` and [re-install shadcn/ui](https://ui.shadcn.com/docs/installation/next)
+---
 
-> Check out [the docs for Local Development](https://supabase.com/docs/guides/getting-started/local-development) to also run Supabase locally.
+## Data flow (ingest)
 
-## Feedback and issues
+1. **Auth:** Get/refresh an app token with **client credentials**. Cache token until expiry.
+2. **Pull commodities:** Hit `/data/wow/auctions/commodities` (regional feed). It refreshes **hourly**; keep your own cadence at or below that.
+3. **Upsert auctions:** Write the latest snapshot rows and append **price history** (e.g., `min_unit_price`, `quantity`, `scanned_at`).
+4. **Enrich items:** For unknown item IDs, call **Item APIs** (e.g., Search Item) once, then cache in `items`.
+5. **Rate limit care:** The commodities doc is **large** and has a higher API cost; avoid unnecessary pulls. Handle 429s with backoff.
 
-Please file feedback and issues over on the [Supabase GitHub org](https://github.com/supabase/supabase/issues/new/choose).
+> Tip: Commodities use `unit_price` (stackable items); non-commodities have bid/buyout. Useful when shaping history tables.
 
-## More Supabase examples
+---
 
-- [Next.js Subscription Payments Starter](https://github.com/vercel/nextjs-subscription-payments)
-- [Cookie-based Auth and the Next.js 13 App Router (free course)](https://youtube.com/playlist?list=PL5S4mPUpp4OtMhpnp93EFSo42iQ40XjbF)
-- [Supabase Auth and the Next.js App Router](https://github.com/supabase/supabase/tree/master/examples/auth/nextjs)
+## Suggested schema (conceptual)
+
+> Check your `supabase/` migrations for exact DDL. This is the typical shape for this app.
+
+* **items**: `item_id (pk)`, `name`, `quality`, `class`, `subclass`, `icon`, `last_enriched_at`
+* **auctions\_snapshot**: `auction_id (pk)`, `item_id (fk)`, `unit_price`, `quantity`, `time_left`, `scanned_at`
+* **auction\_price\_history**: `id (pk)`, `item_id (fk)`, `unit_price`, `quantity`, `captured_at`
+* **scan\_meta**: `id (pk)`, `source`, `region`, `started_at`, `finished_at`, `status`, `note`
+
+(Adjust if you also ingest non-commodity auctions.)
+
+---
+
+## Scheduling (pick one)
+
+* **Vercel Cron** → call an API route (e.g., `/api/ingest`) hourly.
+* **GitHub Actions** → run a Node script with `cron: "0 * * * *"`.
+* **Supabase cron / Edge Functions** → run ingestion close to the DB.
+
+> The commodities feed itself updates hourly—there’s no value polling more often.
+
+---
+
+## Troubleshooting
+
+* **429 Too Many Requests** on commodities: back off and ensure you’re not exceeding cost/limits; the document is heavy.
+* **No data**: verify OAuth token (client credentials) and correct **namespace/region**.
+* **Supabase auth/client**: confirm `NEXT_PUBLIC_SUPABASE_*` and project URL/key.
+
+---
